@@ -5,13 +5,17 @@ import { ContextPage } from "../Context/ContextProvider";
 
 export default function Home(props) {
 
-  const { location, setLocation, reverseGC, setReverseGC, errorMsg, setErrorMsg, foodType, setFoodType, diners, setDiners, foodListVisible, 
-    setFoodListVisible, dinersListVisible, setDinersListVisible, foodTypes, dinersList, findRestaurants } = useContext(ContextPage);
+  const { location, setLocation, errorMsg, setErrorMsg, foodType, setFoodType, diners, setDiners, foodListVisible,
+    setFoodListVisible, dinersListVisible, setDinersListVisible, foodTypes, dinersList, findRestaurants, LoadFoodTypes, setIsLoading } = useContext(ContextPage);
 
     const cities = require('../utils/cities.json');
 
   useEffect(() => {
     (async () => {
+      try {
+
+      //LoadFoodTypes();
+
       let { status } = await Location.requestForegroundPermissionsAsync();
       if (status !== "granted") {
         setErrorMsg("Permission to access location was denied");
@@ -22,25 +26,28 @@ export default function Home(props) {
 
       let heading = await Location.getHeadingAsync({});
       let reverse = await Location.reverseGeocodeAsync(location.coords, { language: 'en' });
-
       console.log(reverse, 'reverse');
 
-      let userLatitude = await location.coords.latitude; // User's latitude
-      let userLongitude = await location.coords.longitude; // User's longitude
-     
       let l;
-
+      
       if (reverse && reverse[0].city) {
-        await setReverseGC(reverse);
         
-        let cityName = reverseGC[0].city;
+        let cityName = reverse[0].city;
         console.log(cityName);
         
-        l = await cities.find((c) => c.name === cityName)?.english_name;
+        // l = await cities.find((c) => c.name === cityName)?.english_name;
+        l = await cities.find((c)=>cityName===c.english_name)?.english_name  //?.=setting l to the english name of the city
+        if(l === undefined) {
+          l = await cities.find((c) => c.name === cityName)?.english_name;
+        }
         console.log(l);
         setLocation(l);        
+        
       } else {
         // Handle the case when the city is not available
+        let userLatitude = location.coords.latitude; // User's latitude
+        let userLongitude = location.coords.longitude; // User's longitude
+
         let closestCity = null;
         let shortestDistance = Infinity;
 
@@ -58,10 +65,12 @@ export default function Home(props) {
             }
           });
           
-          //l = closestCity;
           console.log("Closest city:", closestCity);
           setLocation(closestCity);
         }
+      } catch (error) {
+          console.log(error.message);
+      }
     })();
   }, []);
 
@@ -104,11 +113,13 @@ export default function Home(props) {
     }
   }
 
+
   const handleFind = () => {
     console.log(location, foodType, diners);
     if (location && foodType && diners) {
         findRestaurants(location, foodType, diners);
-        props.navigation.navigate("Page1");
+        setIsLoading(true);
+        props.navigation.navigate("Order");
     } else {
         alert('Invalid Error');
     }
@@ -122,12 +133,14 @@ export default function Home(props) {
             source={require("../assets/icon.png")}
             style={styles.icon}
           />
+          <Text style={styles.text}>DineInTime</Text>
         </View>
         <View style={styles.inputCon}>
           <TextInput
             style={styles.input}
             placeholder="Search By Location"
             onChangeText={setLocation}
+            editable={false}
             value={text}
           />
           <TouchableOpacity onPress={() => setFoodListVisible(true)}>
@@ -142,13 +155,13 @@ export default function Home(props) {
             <View style={styles.modal}>
               {foodTypes.map((item) => (
                 <TouchableOpacity style={styles.modalTO}
-                  key={item.key}
+                  key={item._id}
                   onPress={() => {
-                    setFoodType(item.label);
+                    setFoodType(item.name);
                     setFoodListVisible(false);
                   }}
                 >
-                  <Text style={styles.modalItem}>{item.label}</Text>
+                  <Text style={styles.modalItem}>{item.name}</Text>
                 </TouchableOpacity>
               ))}
             </View>
@@ -202,6 +215,13 @@ const styles = StyleSheet.create({
     width: 100,
     height: 100,
     alignSelf: "center",
+  },
+  text: {
+    alignSelf: "center",
+    color: "#D9D9D9",
+    fontSize: 30,
+    fontFamily: "sans-serif-condensed",
+    fontWeight: 700,
   },
   inputCon: {
     flex: 1,
